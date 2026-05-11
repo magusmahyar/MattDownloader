@@ -1,0 +1,60 @@
+name: Cleanup Expired Jobs
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Delete jobs older than 24 hours
+        run: |
+          set -euo pipefail
+          mkdir -p jobs
+
+          now="$(date -u +%s)"
+          changed=0
+
+          for manifest in jobs/*/manifest.json; do
+            [[ -f "${manifest}" ]] || continue
+            dir="$(dirname "${manifest}")"
+
+            created="$(jq -r '.created_at_utc // empty' "${manifest}")"
+            if [[ -z "${created}" ]]; then
+              echo "Skipping ${dir} (missing created_at_utc)"
+              continue
+            fi
+
+            created_epoch="$(date -u -d "${created}" +%s || echo 0)"
+            if [[ "${created_epoch}" -eq 0 ]]; then
+              echo "Skipping ${dir} (invalid timestamp)"
+              continue
+            fi
+
+            age=$((now - created_epoch))
+            if [[ "${age}" -gt 86400 ]]; then
+              git rm -r "${dir}"
+              echo "Removed expired job: ${dir}"
+              changed=1
+            fi
+          done
+
+          if [[ "${changed}" -eq 0 ]]; then
+            echo "No expired jobs to delete."
+          fi
+
+      - name: Commit and push
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: cleanup expired jobs" || echo "No changes to commit"
+          git push

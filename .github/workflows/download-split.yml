@@ -1,0 +1,126 @@
+name: Download and Prepare Job
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_url:
+        description: Direct download URL
+        required: true
+      job_id:
+        description: Unique job id from app (letters, numbers, dash, underscore)
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: download-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate inputs
+        env:
+          FILE_URL: ${{ github.event.inputs.file_url }}
+          JOB_ID: ${{ github.event.inputs.job_id }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${FILE_URL}" || -z "${JOB_ID}" ]]; then
+            echo "file_url and job_id are required"
+            exit 1
+          fi
+
+          if [[ ! "${FILE_URL}" =~ ^https?:// ]]; then
+            echo "file_url must start with http:// or https://"
+            exit 1
+          fi
+
+          if [[ ! "${JOB_ID}" =~ ^[A-Za-z0-9_-]{6,64}$ ]]; then
+            echo "job_id must match ^[A-Za-z0-9_-]{6,64}$"
+            exit 1
+          fi
+
+      - name: Download source file
+        env:
+          FILE_URL: ${{ github.event.inputs.file_url }}
+          JOB_ID: ${{ github.event.inputs.job_id }}
+        run: |
+          set -euo pipefail
+          JOB_DIR="jobs/${JOB_ID}"
+          mkdir -p "${JOB_DIR}"
+
+          curl --fail -L --max-redirs 50 \
+            --retry 5 --retry-delay 2 --retry-all-errors \
+            -A "Mozilla/5.0 (Mobile Relay Workflow)" \
+            -o "${JOB_DIR}/source.bin" \
+            "${FILE_URL}"
+
+      - name: Split (if needed) and write manifest
+        env:
+          FILE_URL: ${{ github.event.inputs.file_url }}
+          JOB_ID: ${{ github.event.inputs.job_id }}
+        run: |
+          set -euo pipefail
+          JOB_DIR="jobs/${JOB_ID}"
+          SOURCE_FILE="${JOB_DIR}/source.bin"
+          FILE_BIN="${JOB_DIR}/file.bin"
+          CHUNK_DIR="${JOB_DIR}/chunks"
+
+          SIZE_BYTES="$(wc -c < "${SOURCE_FILE}")"
+          SIZE_MB=$(( SIZE_BYTES / 1024 / 1024 ))
+          CHUNK_BYTES=$((95 * 1024 * 1024))
+          CREATED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+          if [[ "${SIZE_MB}" -lt 95 ]]; then
+            mv "${SOURCE_FILE}" "${FILE_BIN}"
+            MODE="single"
+            CHUNK_COUNT=0
+          else
+            mkdir -p "${CHUNK_DIR}"
+            split -b 95M "${SOURCE_FILE}" "${CHUNK_DIR}/chunk_"
+            rm -f "${SOURCE_FILE}"
+            MODE="chunked"
+            CHUNK_COUNT="$(ls -1 "${CHUNK_DIR}" | wc -l | tr -d ' ')"
+          fi
+
+          # Human-readable name for clients (URL path; safe characters only).
+          SUGGESTED="$(python3 -c 'import os,re,urllib.parse; u=os.environ["FILE_URL"]; p=urllib.parse.urlparse(u).path; n=os.path.basename(p) or "download.bin"; n=urllib.parse.unquote(n); n=re.sub(r"[^A-Za-z0-9._-]+", "_", n).strip("._") or "download.bin"; print(n[:180])')"
+
+          jq -n \
+            --arg job_id "${JOB_ID}" \
+            --arg source_url "${FILE_URL}" \
+            --arg created "${CREATED_AT}" \
+            --arg mode "${MODE}" \
+            --argjson total_size_bytes "${SIZE_BYTES}" \
+            --argjson chunk_size_bytes "${CHUNK_BYTES}" \
+            --argjson chunk_count "${CHUNK_COUNT}" \
+            --arg suggested "${SUGGESTED}" \
+            '{
+              job_id: $job_id,
+              source_url: $source_url,
+              created_at_utc: $created,
+              mode: $mode,
+              total_size_bytes: $total_size_bytes,
+              chunk_size_bytes: $chunk_size_bytes,
+              chunk_count: $chunk_count,
+              single_file_path: ("jobs/" + $job_id + "/file.bin"),
+              chunks_path_prefix: ("jobs/" + $job_id + "/chunks/chunk_"),
+              suggested_filename: $suggested
+            }' > "${JOB_DIR}/manifest.json"
+
+      - name: Commit and push job files
+        env:
+          JOB_ID: ${{ github.event.inputs.job_id }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "jobs/${JOB_ID}"
+          git commit -m "job: add ${JOB_ID}" || echo "No changes to commit"
+          git push
