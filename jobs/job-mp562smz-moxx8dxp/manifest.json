@@ -1,0 +1,12 @@
+{
+  "job_id": "job-mp562smz-moxx8dxp",
+  "source_url": "https://youtube.com/watch?v=gCrRoEu90DY&pp=ygUadGhlIGN1cnNlIG9mIGJldGEgcmF5IGJpbGw%3D",
+  "created_at_utc": "2026-05-14T07:28:43Z",
+  "mode": "single",
+  "total_size_bytes": 1048978,
+  "chunk_size_bytes": 99614720,
+  "chunk_count": 0,
+  "single_file_path": "jobs/job-mp562smz-moxx8dxp/file.bin",
+  "chunks_path_prefix": "jobs/job-mp562smz-moxx8dxp/chunks/chunk_",
+  "suggested_filename": "watch"
+}
