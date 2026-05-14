@@ -1,0 +1,12 @@
+{
+  "job_id": "job-mp5751lp-be0hgulf",
+  "source_url": "https://dhruvmirrorpremium0-9d786801cf0f.herokuapp.com/74739/Q2dvVBYWWVK90rFbTXxf%2BgCrRoEu90DY.mp4?hash=AgADeZ",
+  "created_at_utc": "2026-05-14T07:58:58Z",
+  "mode": "chunked",
+  "total_size_bytes": 409652446,
+  "chunk_size_bytes": 99614720,
+  "chunk_count": 5,
+  "single_file_path": "jobs/job-mp5751lp-be0hgulf/file.bin",
+  "chunks_path_prefix": "jobs/job-mp5751lp-be0hgulf/chunks/chunk_",
+  "suggested_filename": "Q2dvVBYWWVK90rFbTXxf_gCrRoEu90DY.mp4"
+}
