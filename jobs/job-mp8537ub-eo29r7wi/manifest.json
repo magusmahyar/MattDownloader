@@ -1,0 +1,12 @@
+{
+  "job_id": "job-mp8537ub-eo29r7wi",
+  "source_url": "https://www.youtube.com/watch?v=fyRECe-xj60",
+  "created_at_utc": "2026-05-16T09:24:35Z",
+  "mode": "single",
+  "total_size_bytes": 999432,
+  "chunk_size_bytes": 99614720,
+  "chunk_count": 0,
+  "single_file_path": "jobs/job-mp8537ub-eo29r7wi/file.bin",
+  "chunks_path_prefix": "jobs/job-mp8537ub-eo29r7wi/chunks/chunk_",
+  "suggested_filename": "watch"
+}
